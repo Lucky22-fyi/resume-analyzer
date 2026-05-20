@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Recruiter Panel - Resume Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>AI Resume Analyzer</h1>
+    <div class="header-right">
+        <span> Recruiter</span>
+        <a href="recruiter_history.html" class="nav-btn"> History</a>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card">
+        <h2>Recruiter Panel</h2>
+
+        <label>Paste Job Description:</label>
+        <textarea id="jd_recruiter" placeholder="Paste job description here..." required></textarea>
+
+        <label>Upload Multiple Resumes (PDF):</label>
+        <input type="file" id="recruiterResumes" accept=".pdf" multiple>
+
+        <button id="recruiterBtn"> Analyze & Rank Candidates</button>
+
+        <div id="result2" class="result-box"></div>
+    </div>
+</div>
+
+<script>
+    if (sessionStorage.getItem("role") !== "recruiter") {
+        window.location.href = "login.html";
+    }
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = "login.html";
+    }
+
+    document.getElementById("recruiterBtn").onclick = async function () {
+        const jd = document.getElementById("jd_recruiter").value.trim();
+        const files = document.getElementById("recruiterResumes").files;
+        const resultBox = document.getElementById("result2");
+
+        if (!jd) { alert("Job Description daalo!"); return; }
+        if (files.length === 0) { alert("Kam se kam ek resume upload karo!"); return; }
+
+        resultBox.style.display = "block";
+        resultBox.innerHTML = "<p>Analyzing all resumes... </p>";
+
+        const formData = new FormData();
+        formData.append("job_description", jd);
+        for (let file of files) formData.append("resumes", file);
+
+        try {
+            const res = await fetch("http://127.0.0.1:5000/analyze-multiple", {
+                method: "POST",
+                body: formData
+            });
+            const data = await res.json();
+
+            if (data.error) { resultBox.innerHTML = `<p> ${data.error}</p>`; return; }
+
+            let html = `<h3> Candidate Rankings</h3>
+                <p style="color:#94a3b8;margin-bottom:12px">Results saved to history automatically </p>`;
+
+            data.forEach((item, index) => {
+                const scoreClass = item.ats_score > 70 ? "good" : item.ats_score > 40 ? "mid" : "bad";
+                html += `
+                    <div class="candidate-card">
+                        <div class="candidate-rank">#${index + 1}</div>
+                        <div class="candidate-info">
+                            <b>${item.name}</b>
+                            <span class="${scoreClass}">ATS Score: ${item.ats_score} | Probability: ${item.selection_probability}%</span>
+                            <span>Matched: ${item.skills_match.join(", ") || "None"}</span>
+                            <span>Missing: ${item.missing_skills.join(", ") || "None"}</span>
+                        </div>
+                    </div>`;
+            });
+
+            html += `<div style="margin-top:15px"><a href="recruiter_history.html" class="nav-btn" style="display:inline-block">📋 View Full History</a></div>`;
+            resultBox.innerHTML = html;
+
+        } catch (err) {
+            resultBox.innerHTML = `<p> Server connect nahi ho raha.</p>`;
+        }
+    };
+</script>
+
+</body>
+</html>

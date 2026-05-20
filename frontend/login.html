@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Resume Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header style="justify-content: center;">
+    <h1>AI Resume Analyzer</h1>
+</header>
+
+<div class="container">
+    <div class="card login-card">
+        <h2>Welcome! Select Your Role</h2>
+        <p class="subtitle">Please login to continue</p>
+
+        <div class="login-row">
+
+            <!-- CANDIDATE -->
+            <div class="login-box">
+                <h3>Candidate</h3>
+                <input type="text" id="candidateUser" placeholder="Username">
+                <input type="password" id="candidatePass" placeholder="Password">
+                <button onclick="login('candidate')">Login as Candidate</button>
+            </div>
+
+            <!-- DIVIDER -->
+            <div class="vertical-divider">OR</div>
+
+            <!-- RECRUITER -->
+            <div class="login-box">
+                <h3>Recruiter</h3>
+                <input type="text" id="recruiterUser" placeholder="Username">
+                <input type="password" id="recruiterPass" placeholder="Password">
+                <button onclick="login('recruiter')">Login as Recruiter</button>
+            </div>
+
+        </div>
+
+        <p id="loginError" class="error-msg"></p>
+    </div>
+</div>
+
+<script>
+    const USERS = {
+        candidate: { username: "student", password: "student123" },
+        recruiter: { username: "recruiter", password: "recruiter123" }
+    };
+
+    function login(role) {
+        const username = document.getElementById(role === "candidate" ? "candidateUser" : "recruiterUser").value.trim();
+        const password = document.getElementById(role === "candidate" ? "candidatePass" : "recruiterPass").value.trim();
+        const errorEl = document.getElementById("loginError");
+
+        if (!username || !password) {
+            errorEl.innerText = "Please enter username and password!";
+            return;
+        }
+
+        const correct = USERS[role];
+
+        if (username === correct.username && password === correct.password) {
+            sessionStorage.setItem("role", role);
+            window.location.href = role === "candidate" ? "index.html" : "recruiter.html";
+        } else {
+            errorEl.innerText = " Wrong username or password!";
+        }
+    }
+</script>
+
+</body>
+</html>

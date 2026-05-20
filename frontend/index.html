@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Candidate Panel - Resume Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>AI Resume Analyzer</h1>
+    <div class="header-right">
+        <span>Candidate</span>
+        <a href="history.html" class="nav-btn"> My Progress</a>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="card">
+        <h2>Candidate Panel</h2>
+
+        <label>Paste Job Description:</label>
+        <textarea id="jd_input" placeholder="Paste job description here..." required></textarea>
+
+        <label>Upload Resume (PDF):</label>
+        <input type="file" id="resumeInput" accept=".pdf">
+
+        <button id="analyzeBtn"> Analyze Resume</button>
+
+        <div id="result" class="result-box"></div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+<script>
+    if (sessionStorage.getItem("role") !== "candidate") {
+        window.location.href = "login.html";
+    }
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = "login.html";
+    }
+</script>
+
+</body>
+</html>

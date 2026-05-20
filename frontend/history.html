@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Progress - Resume Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>AI Resume Analyzer</h1>
+    <div class="header-right">
+        <span> Candidate</span>
+        <a href="index.html" class="nav-btn"> Analyze</a>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="history-header">
+        <h2> My Resume Progress</h2>
+        <p class="subtitle">Track how your resume has improved over time</p>
+    </div>
+
+    <div id="statsBox" class="stats-row"></div>
+
+    <div id="aiProgressSection" class="ai-section" style="display:none;">
+        <button id="aiProgressBtn" onclick="getAIProgress()" class="ai-btn">
+        AI Se Progress Analyze Karwao (Llama3)
+        </button>
+        <div id="aiProgressResult" class="ai-progress-box" style="display:none;"></div>
+    </div>
+
+    <div id="historyList" class="history-list"></div>
+</div>
+
+<script>
+    if (sessionStorage.getItem("role") !== "candidate") {
+        window.location.href = "login.html";
+    }
+
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = "login.html";
+    }
+
+    let allHistory = [];
+
+    async function loadHistory() {
+        const list = document.getElementById("historyList");
+        const statsBox = document.getElementById("statsBox");
+
+        list.innerHTML = "<p style='color:#94a3b8;text-align:center'>Loading...</p>";
+
+        try {
+            const res = await fetch("http://127.0.0.1:5000/candidate/history");
+            allHistory = await res.json();
+
+            if (!allHistory.length) {
+                list.innerHTML = "<p style='color:#94a3b8;text-align:center;padding:40px'>No analysis history yet. <a href='index.html' style='color:#60a5fa'>Analyze your resume!</a></p>";
+                return;
+            }
+
+            const avgScore = (allHistory.reduce((s, d) => s + d.ats_score, 0) / allHistory.length).toFixed(1);
+            const best = Math.max(...allHistory.map(d => d.ats_score));
+            const latest = allHistory[0].ats_score;
+            const first = allHistory[allHistory.length - 1].ats_score;
+            const improvement = (latest - first).toFixed(1);
+            const impColor = improvement >= 0 ? '#22c55e' : '#ef4444';
+
+            statsBox.innerHTML = `
+                <div class="stat-card">
+                    <span class="stat-val">${allHistory.length}</span>
+                    <span class="stat-label">Total Analyses</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" style="color:#60a5fa">${avgScore}</span>
+                    <span class="stat-label">Average ATS Score</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" style="color:#22c55e">${best}</span>
+                    <span class="stat-label">Best Score Ever</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" style="color:${impColor}">${improvement >= 0 ? '+' : ''}${improvement}</span>
+                    <span class="stat-label">Overall Change</span>
+                </div>
+            `;
+
+            if (allHistory.length >= 2) {
+                document.getElementById("aiProgressSection").style.display = "flex";
+            }
+
+            list.innerHTML = allHistory.map((item, index) => {
+                const scoreClass = item.ats_score > 70 ? "good" : item.ats_score > 40 ? "mid" : "bad";
+                const date = new Date(item.analyzed_at).toLocaleString("en-IN");
+
+                let trend = "";
+                if (index < allHistory.length - 1) {
+                    const prevScore = allHistory[index + 1].ats_score;
+                    const diff = (item.ats_score - prevScore).toFixed(1);
+                    if (diff > 0) trend = `<span style="color:#22c55e">▲ +${diff}</span>`;
+                    else if (diff < 0) trend = `<span style="color:#ef4444">▼ ${diff}</span>`;
+                    else trend = `<span style="color:#94a3b8">● No change</span>`;
+                } else {
+                    trend = `<span style="color:#60a5fa"> First Analysis</span>`;
+                }
+
+                return `
+                    <div class="history-card" id="card-${item.id}">
+                        <div class="history-card-header">
+                            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+                                <span class="history-index">#${allHistory.length - index}</span>
+                                <span class="history-filename"> ${item.filename}</span>
+                                <span class="history-date"> ${date}</span>
+                                ${item.llm_used ? '<span class="llm-badge"> AI Enhanced</span>' : '<span class="llm-badge nlp-only">📊 NLP</span>'}
+                                ${trend}
+                            </div>
+                            <button class="delete-btn" onclick="deleteRecord(${item.id})">🗑 Delete</button>
+                        </div>
+
+                        <div class="score-box" style="margin-top:12px">
+                            <div class="score-item">
+                                <span class="score-label">ATS Score</span>
+                                <span class="score-value ${scoreClass}">${item.ats_score}/100</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">Selection Probability</span>
+                                <span class="score-value ${scoreClass}">${item.selection_probability}%</span>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h4> Summary</h4>
+                            <p>${item.summary}</p>
+                        </div>
+
+                        <div class="section">
+                            <h4> Matched Skills (${item.skills_match.length})</h4>
+                            <div class="skills-container">
+                                ${item.skills_match.length > 0
+                                    ? item.skills_match.map(s => `<span class="skill-tag match">${s}</span>`).join("")
+                                    : "<span class='none-text'>None</span>"}
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h4>Missing Skills (${item.missing_skills.length})</h4>
+                            <div class="skills-container">
+                                ${item.missing_skills.length > 0
+                                    ? item.missing_skills.map(s => `<span class="skill-tag missing">${s}</span>`).join("")
+                                    : "<span class='none-text'>None! </span>"}
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h4> Suggestions</h4>
+                            <ul>${item.suggestions.map(s => `<li>${s}</li>`).join("")}</ul>
+                        </div>
+
+                        <details style="margin-top:12px;">
+                            <summary style="color:#64748b; cursor:pointer; font-size:0.85em;"> View Job Description</summary>
+                            <p class="jd-preview" style="margin-top:8px;">${item.job_description}</p>
+                        </details>
+                    </div>
+                `;
+            }).join("");
+
+        } catch (err) {
+            list.innerHTML = `<p style='color:#ef4444;text-align:center'> Server se connect nahi ho raha. Flask chal raha hai?</p>`;
+        }
+    }
+
+    async function getAIProgress() {
+        const btn = document.getElementById("aiProgressBtn");
+        const resultBox = document.getElementById("aiProgressResult");
+
+        btn.disabled = true;
+        btn.innerText = " Llama3 Analyze kar raha hai... (1-2 min lag sakte hain)";
+        resultBox.style.display = "block";
+        resultBox.innerHTML = "<p style='color:#94a3b8;text-align:center'> AI processing... please wait</p>";
+
+        try {
+            const res = await fetch("http://127.0.0.1:5000/candidate/ai-progress", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ history: allHistory })
+            });
+
+            const data = await res.json();
+
+            if (data.error) {
+                resultBox.innerHTML = `<p style='color:#ef4444'> ${data.error}</p>`;
+                return;
+            }
+
+            const isLLM = data.llm_used;
+            const raw = data.analysis;
+
+            const sections = {
+                "IMPROVEMENTS": { icon: "", color: "#22c55e" },
+                "DECLINED": { icon: "", color: "#ef4444" },
+                "CONSISTENT WEAKNESSES": { icon: "", color: "#facc15" },
+                "BEST PERFORMANCE": { icon: "", color: "#60a5fa" },
+                "ACTION PLAN": { icon: "", color: "#a78bfa" },
+            };
+
+            let html = `
+                <div style="margin-bottom:15px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <span class="${isLLM ? 'llm-badge' : 'llm-badge nlp-only'}">
+                        ${isLLM ? ' Llama3 AI Analysis' : ' Basic NLP Analysis'}
+                    </span>
+                    <span style="color:#64748b; font-size:0.85em;">Based on ${allHistory.length} analyses</span>
+                </div>
+            `;
+
+            let currentSection = null;
+            let currentContent = [];
+
+            const flushSection = () => {
+                if (!currentSection) return;
+                const cfg = sections[currentSection];
+                if (!cfg) return;
+                const points = currentContent.filter(l => l.trim().startsWith("-")).map(l =>
+                    `<li>${l.trim().substring(1).trim()}</li>`
+                ).join("");
+                const plain = currentContent.filter(l => !l.trim().startsWith("-") && l.trim()).map(l =>
+                    `<p style="color:#94a3b8">${l.trim()}</p>`
+                ).join("");
+
+                html += `
+                    <div class="progress-section" style="border-left: 3px solid ${cfg.color}">
+                        <h4 style="color:${cfg.color}">${cfg.icon} ${currentSection}</h4>
+                        ${points ? `<ul>${points}</ul>` : ""}
+                        ${plain}
+                    </div>
+                `;
+                currentContent = [];
+            };
+
+            raw.split("\n").forEach(line => {
+                const trimmed = line.trim();
+                const foundSection = Object.keys(sections).find(s => trimmed.startsWith(s + ":") || trimmed === s);
+                if (foundSection) {
+                    flushSection();
+                    currentSection = foundSection;
+                    const rest = trimmed.replace(foundSection + ":", "").trim();
+                    if (rest) currentContent.push(rest);
+                } else if (currentSection) {
+                    currentContent.push(line);
+                }
+            });
+            flushSection();
+
+            resultBox.innerHTML = html;
+
+        } catch (err) {
+            resultBox.innerHTML = `<p style='color:#ef4444'> Error: ${err.message}</p>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerText = " AI Se Progress Analyze Karwao (Llama3)";
+        }
+    }
+
+    async function deleteRecord(id) {
+        if (!confirm("Kya aap yeh record delete karna chahte hain?")) return;
+        try {
+            await fetch(`http://127.0.0.1:5000/candidate/history/${id}`, { method: "DELETE" });
+            document.getElementById(`card-${id}`).remove();
+            allHistory = allHistory.filter(h => h.id !== id);
+        } catch (err) {
+            alert("Delete failed!");
+        }
+    }
+
+    loadHistory();
+</script>
+
+</body>
+</html>

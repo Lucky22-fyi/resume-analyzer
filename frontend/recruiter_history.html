@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Recruiter History - Resume Analyzer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <h1>AI Resume Analyzer</h1>
+    <div class="header-right">
+        <span> Recruiter</span>
+        <a href="recruiter.html" class="nav-btn"> Analyze</a>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</header>
+
+<div class="container" style="max-width: 900px;">
+    <div class="history-header">
+        <h2> Recruiter Analysis History</h2>
+        <p class="subtitle">All past screening sessions and candidate rankings</p>
+    </div>
+
+    <div id="statsBox" class="stats-row"></div>
+    <div id="historyList"></div>
+</div>
+
+<script>
+    if (sessionStorage.getItem("role") !== "recruiter") {
+        window.location.href = "login.html";
+    }
+
+    function logout() {
+        sessionStorage.clear();
+        window.location.href = "login.html";
+    }
+
+    async function loadHistory() {
+        const list = document.getElementById("historyList");
+        const statsBox = document.getElementById("statsBox");
+
+        list.innerHTML = "<p style='color:#94a3b8'>Loading...</p>";
+
+        try {
+            const res = await fetch("http://127.0.0.1:5000/recruiter/history");
+            const data = await res.json();
+
+            if (!data.length) {
+                list.innerHTML = "<p style='color:#94a3b8;text-align:center;padding:40px'>No history yet. <a href='recruiter.html' style='color:#60a5fa'>Start analyzing!</a></p>";
+                return;
+            }
+
+            // Stats
+            const totalSessions = data.length;
+            const totalResumes = data.reduce((s, d) => s + d.total_resumes, 0);
+            const avgTopScore = (data.reduce((s, d) => s + d.top_score, 0) / data.length).toFixed(1);
+
+            statsBox.innerHTML = `
+                <div class="stat-card">
+                    <span class="stat-val">${totalSessions}</span>
+                    <span class="stat-label">Total Sessions</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" style="color:#60a5fa">${totalResumes}</span>
+                    <span class="stat-label">Total Resumes Screened</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-val" style="color:#22c55e">${avgTopScore}</span>
+                    <span class="stat-label">Avg Top Score</span>
+                </div>
+            `;
+
+            // History list
+            list.innerHTML = data.map((item, index) => {
+                const date = new Date(item.analyzed_at).toLocaleString("en-IN");
+                const scoreClass = item.top_score > 70 ? "good" : item.top_score > 40 ? "mid" : "bad";
+                return `
+                    <div class="history-card" id="rcard-${item.id}">
+                        <div class="history-card-header">
+                            <div>
+                                <span class="history-index">Session #${data.length - index}</span>
+                                <span class="history-date"> ${date}</span>
+                                <span class="history-filename"> ${item.total_resumes} resumes screened</span>
+                            </div>
+                            <button class="delete-btn" onclick="deleteRecord(${item.id})">🗑 Delete</button>
+                        </div>
+
+                        <div class="score-box" style="margin-top:12px">
+                            <div class="score-item">
+                                <span class="score-label">Top Candidate</span>
+                                <span class="score-value" style="font-size:1.2em;color:#60a5fa">${item.top_candidate}</span>
+                            </div>
+                            <div class="score-item">
+                                <span class="score-label">Top ATS Score</span>
+                                <span class="score-value ${scoreClass}">${item.top_score}/100</span>
+                            </div>
+                        </div>
+
+                        <div class="section">
+                            <h4> All Candidates (Ranked)</h4>
+                            ${item.all_results.map((r, i) => {
+                                const sc = r.ats_score > 70 ? "good" : r.ats_score > 40 ? "mid" : "bad";
+                                return `
+                                    <div class="candidate-card">
+                                        <div class="candidate-rank">#${i + 1}</div>
+                                        <div class="candidate-info">
+                                            <b>${r.name}</b>
+                                            <span class="${sc}">ATS: ${r.ats_score} | Probability: ${r.selection_probability}%</span>
+                                            <span>Matched: ${r.skills_match.join(", ") || "None"}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join("")}
+                        </div>
+
+                        <div class="section">
+                            <h4> Job Description</h4>
+                            <p class="jd-preview">${item.job_description.substring(0, 200)}${item.job_description.length > 200 ? '...' : ''}</p>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+
+        } catch (err) {
+            list.innerHTML = `<p style='color:#ef4444'> Server se connect nahi ho raha.</p>`;
+        }
+    }
+
+    async function deleteRecord(id) {
+        if (!confirm("Kya aap yeh session delete karna chahte hain?")) return;
+        try {
+            await fetch(`http://127.0.0.1:5000/recruiter/history/${id}`, { method: "DELETE" });
+            document.getElementById(`rcard-${id}`).remove();
+        } catch (err) {
+            alert("Delete failed!");
+        }
+    }
+
+    loadHistory();
+</script>
+
+</body>
+</html>
